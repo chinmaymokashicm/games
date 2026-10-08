@@ -4,6 +4,7 @@ set -euo pipefail
 APP_NAME="Wordle by Chinmay Mokashi"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+AUTO_INSTALL_PYTHON="${AUTO_INSTALL_PYTHON:-0}"
 VENV_DIR="$ROOT_DIR/.venv-mac"
 ICON_PNG="$ROOT_DIR/assets/wordle/logo.png"
 ICON_ICNS="$ROOT_DIR/assets/wordle/logo.icns"
@@ -16,6 +17,35 @@ if [[ "$TARGET_ARCH" != "x86_64" && "$TARGET_ARCH" != "arm64" && "$TARGET_ARCH" 
 fi
 
 cd "$ROOT_DIR"
+
+check_python_version() {
+  local py_cmd="$1"
+  "$py_cmd" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1
+}
+
+if ! check_python_version "$PYTHON_BIN"; then
+  if [[ "$AUTO_INSTALL_PYTHON" == "1" ]]; then
+    if ! command -v brew >/dev/null 2>&1; then
+      echo "Python 3.11+ is required, and Homebrew is not available for auto-install."
+      echo "Install Python 3.11 manually, or set PYTHON_BIN to a valid 3.11 interpreter."
+      exit 1
+    fi
+
+    echo "Installing Python 3.11 via Homebrew..."
+    brew install python@3.11
+
+    if command -v python3.11 >/dev/null 2>&1; then
+      PYTHON_BIN="$(command -v python3.11)"
+    fi
+  fi
+fi
+
+if ! check_python_version "$PYTHON_BIN"; then
+  echo "Python 3.11+ is required."
+  echo "Use: PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh"
+  echo "Or auto-install: AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh"
+  exit 1
+fi
 
 "$PYTHON_BIN" -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"

@@ -1,6 +1,14 @@
 # games
 Play games
 
+## Python version requirement
+
+Use Python `3.11` for local builds and runtime.
+
+- The local build scripts now enforce `>=3.11`.
+- GitHub Actions workflows also verify Python `3.11` explicitly.
+- The apps now show a friendly startup error if run with an older Python interpreter.
+
 ## Push this repo to GitHub
 
 1. Create a new empty repository on GitHub.
@@ -21,6 +29,8 @@ If `origin` already exists, update it with:
 
 1. Run:
 	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1`
+	- Optional explicit interpreter: `$env:PYTHON_BIN='C:\Path\To\Python311\python.exe'; powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1`
+	- Optional auto-install Python 3.11 (winget): `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -InstallPython`
 2. Outputs:
 	- `dist_windows/Wordle by Chinmay Mokashi/Wordle by Chinmay Mokashi.exe`
 	- `dist_windows/Wordle by Chinmay Mokashi-windows.zip`
@@ -41,6 +51,8 @@ If `origin` already exists, update it with:
 2. Run:
 	- `chmod +x scripts/build_macos_app.sh`
 	- `./scripts/build_macos_app.sh`
+	- Optional explicit interpreter: `PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh`
+	- Optional auto-install Python 3.11 (Homebrew): `AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh`
 	- Optional architecture override: `TARGET_ARCH=universal2 ./scripts/build_macos_app.sh`
 3. Output:
 	- `dist/Wordle by Chinmay Mokashi.app`

@@ -1,5 +1,6 @@
 param(
-    [switch]$Install
+    [switch]$Install,
+    [switch]$InstallPython
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,29 +8,80 @@ $AppName = "Wordle by Chinmay Mokashi"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $Root
 
-$Python = "python"
+$PythonExe = $null
+$PythonPrefixArgs = @()
+
+function Set-PythonCommand {
+    if ($env:PYTHON_BIN) {
+        $script:PythonExe = $env:PYTHON_BIN
+        $script:PythonPrefixArgs = @()
+        return
+    }
+
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        $script:PythonExe = "py"
+        $script:PythonPrefixArgs = @("-3.11")
+        return
+    }
+
+    $script:PythonExe = "python"
+    $script:PythonPrefixArgs = @()
+}
+
+function Invoke-Python {
+    param(
+        [string[]]$Args
+    )
+    & $script:PythonExe @script:PythonPrefixArgs @Args
+}
+
+function Test-Python311 {
+    Invoke-Python -Args @("-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)") | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+Set-PythonCommand
 $IconPath = Join-Path $Root "assets/wordle/logo.ico"
 $DistDir = Join-Path $Root "dist_windows"
 $WorkDir = Join-Path $Root "build_windows"
 
-python -m pip install --upgrade pip
-pip install pyinstaller pygame
+if (-not (Test-Python311)) {
+    if ($InstallPython) {
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            throw "Python 3.11+ is required and winget is unavailable. Install Python 3.11 manually or set PYTHON_BIN."
+        }
+
+        Write-Host "Installing Python 3.11 with winget..."
+        winget install --id Python.Python.3.11 -e --source winget --scope user --accept-source-agreements --accept-package-agreements
+
+        Set-PythonCommand
+    }
+}
+
+if (-not (Test-Python311)) {
+    throw "Python 3.11+ is required. Set PYTHON_BIN to a Python 3.11 interpreter, or rerun with -InstallPython."
+}
+
+Invoke-Python -Args @("-m", "pip", "install", "--upgrade", "pip")
+Invoke-Python -Args @("-m", "pip", "install", "pyinstaller", "pygame")
 
 $IconArgs = @()
 if (Test-Path $IconPath) {
     $IconArgs = @("--icon", $IconPath)
 }
 
-pyinstaller `
-    --noconfirm `
-    --clean `
-    --windowed `
-    --name "$AppName" `
-    --add-data "assets/wordle;assets/wordle" `
-    --distpath "$DistDir" `
-    --workpath "$WorkDir" `
-    @IconArgs `
-    wordle_ui.py
+$PyInstallerArgs = @(
+    "-m", "PyInstaller",
+    "--noconfirm",
+    "--clean",
+    "--windowed",
+    "--name", $AppName,
+    "--add-data", "assets/wordle;assets/wordle",
+    "--distpath", $DistDir,
+    "--workpath", $WorkDir
+) + $IconArgs + @("wordle_ui.py")
+
+Invoke-Python -Args $PyInstallerArgs
 
 $AppFolder = Join-Path $DistDir $AppName
 $ExePath = Join-Path $AppFolder "$AppName.exe"

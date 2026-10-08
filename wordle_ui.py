@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from assets.wordle.load import FULL_DICTIONARY, TARGET_WORDS
 from assets.wordle.logic import WordleGame, evaluate_guess
 from assets.wordle.analytics import WordleAnalytics, TurnAnalysis
