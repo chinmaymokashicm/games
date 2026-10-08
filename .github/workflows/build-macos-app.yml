@@ -1,0 +1,196 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x86_64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      APP_NAME: Wordle by Chinmay Mokashi
+      APP_ARCH: ${{ matrix.arch }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pygame
+
+      - name: Build icon file
+        shell: bash
+        run: |
+          if [[ -f assets/wordle/logo.png ]]; then
+            mkdir -p build/icon.iconset
+            sips -z 16 16     assets/wordle/logo.png --out build/icon.iconset/icon_16x16.png >/dev/null
+            sips -z 32 32     assets/wordle/logo.png --out build/icon.iconset/icon_16x16@2x.png >/dev/null
+            sips -z 32 32     assets/wordle/logo.png --out build/icon.iconset/icon_32x32.png >/dev/null
+            sips -z 64 64     assets/wordle/logo.png --out build/icon.iconset/icon_32x32@2x.png >/dev/null
+            sips -z 128 128   assets/wordle/logo.png --out build/icon.iconset/icon_128x128.png >/dev/null
+            sips -z 256 256   assets/wordle/logo.png --out build/icon.iconset/icon_128x128@2x.png >/dev/null
+            sips -z 256 256   assets/wordle/logo.png --out build/icon.iconset/icon_256x256.png >/dev/null
+            sips -z 512 512   assets/wordle/logo.png --out build/icon.iconset/icon_256x256@2x.png >/dev/null
+            sips -z 512 512   assets/wordle/logo.png --out build/icon.iconset/icon_512x512.png >/dev/null
+            sips -z 1024 1024 assets/wordle/logo.png --out build/icon.iconset/icon_512x512@2x.png >/dev/null
+            iconutil -c icns build/icon.iconset -o assets/wordle/logo.icns
+          fi
+
+      - name: Build app with PyInstaller
+        shell: bash
+        run: |
+          if [[ -f assets/wordle/logo.icns ]]; then
+            ICON_ARG="--icon assets/wordle/logo.icns"
+          else
+            ICON_ARG=""
+          fi
+
+          pyinstaller \
+            --noconfirm \
+            --clean \
+            --windowed \
+            --name "$APP_NAME" \
+            --target-architecture "$APP_ARCH" \
+            --add-data "assets/wordle:assets/wordle" \
+            $ICON_ARG \
+            wordle_ui.py
+
+      - name: Detect signing configuration
+        id: detect_signing
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_DEVELOPER_ID_APPLICATION: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+        run: |
+          missing=0
+          for name in \
+            MACOS_CERTIFICATE_P12_BASE64 \
+            MACOS_CERTIFICATE_PASSWORD \
+            APPLE_ID \
+            APPLE_APP_SPECIFIC_PASSWORD \
+            APPLE_TEAM_ID \
+            APPLE_DEVELOPER_ID_APPLICATION; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing secret: $name"
+              missing=1
+            fi
+          done
+
+          if [[ "$missing" -eq 0 ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Signing + notarization enabled."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Signing + notarization disabled. Building unsigned artifact."
+          fi
+
+      - name: Import Developer ID certificate
+        if: ${{ steps.detect_signing.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/developer_id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="${{ github.run_id }}-${{ github.run_attempt }}"
+
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+      - name: Code sign app bundle
+        if: ${{ steps.detect_signing.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+        run: |
+          APP_PATH="dist/$APP_NAME.app"
+          codesign \
+            --deep \
+            --force \
+            --verify \
+            --verbose \
+            --options runtime \
+            --sign "$APPLE_DEVELOPER_ID_APPLICATION" \
+            "$APP_PATH"
+
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: Notarize and staple app
+        if: ${{ steps.detect_signing.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="dist/$APP_NAME.app"
+          ZIP_PATH="dist/$APP_NAME-macOS-$APP_ARCH.zip"
+
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "$APP_PATH"
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+      - name: Zip app bundle
+        if: ${{ steps.detect_signing.outputs.enabled != 'true' }}
+        shell: bash
+        run: |
+          APP_PATH="dist/$APP_NAME.app"
+          ZIP_PATH="dist/$APP_NAME-macOS-$APP_ARCH.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+      - name: Cleanup temporary signing keychain
+        if: ${{ always() && steps.detect_signing.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          if [[ -f "$KEYCHAIN_PATH" ]]; then
+            security delete-keychain "$KEYCHAIN_PATH" || true
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordle-by-chinmay-mokashi-macos-${{ matrix.arch }}
+          path: dist/Wordle by Chinmay Mokashi-macOS-${{ matrix.arch }}.zip

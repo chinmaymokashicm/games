@@ -1,0 +1,34 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+
+# Build artifacts
+build/
+build_*/
+dist/
+dist_*/
+*.egg-info/
+
+# PyInstaller runtime/cache
+*.manifest
+*.spec.bak
+
+# macOS/Windows junk
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Local logs/temp
+*.log
+*.tmp
+*.bak
