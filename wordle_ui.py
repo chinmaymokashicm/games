@@ -76,10 +76,46 @@ class Button:
 pygame.init()
 pygame.font.init()
 
-FONT_TITLE: pygame.font.Font = pygame.font.SysFont("Helvetica", 24, bold=True)
-FONT_BTN: pygame.font.Font = pygame.font.SysFont("Helvetica", 14, bold=True)
-FONT_TILE: pygame.font.Font = pygame.font.SysFont("Helvetica", 28, bold=True)
-FONT_STATUS: pygame.font.Font = pygame.font.SysFont("Helvetica", 16, bold=True)
+def load_ui_font(size: int, bold: bool = False, role: str = "ui") -> pygame.font.Font:
+    if sys.platform == "darwin":
+        # Prefer native macOS UI fonts first.
+        candidates = [
+            "Avenir Next",
+            "SF Pro Text",
+            "Helvetica Neue",
+            "Helvetica",
+            "Arial",
+        ]
+    elif sys.platform.startswith("win"):
+        candidates = [
+            "Segoe UI Variable",
+            "Segoe UI",
+            "Calibri",
+            "Arial",
+        ]
+    else:
+        candidates = [
+            "Noto Sans",
+            "DejaVu Sans",
+            "Liberation Sans",
+            "Arial",
+        ]
+
+    if role == "title":
+        candidates = ["Avenir Next", "Segoe UI", "Noto Sans"] + candidates
+
+    for family in candidates:
+        font_path = pygame.font.match_font(family, bold=bold)
+        if font_path:
+            return pygame.font.Font(font_path, size)
+
+    return pygame.font.SysFont(None, size, bold=bold)
+
+
+FONT_TITLE: pygame.font.Font = load_ui_font(26, bold=True, role="title")
+FONT_BTN: pygame.font.Font = load_ui_font(14, bold=True)
+FONT_TILE: pygame.font.Font = load_ui_font(30, bold=True)
+FONT_STATUS: pygame.font.Font = load_ui_font(16, bold=True)
 
 
 def resolve_resource_path(relative_path: str) -> Path:
@@ -197,7 +233,7 @@ KEYBOARD_LAYOUT = [
 KEY_WIDTH = 30
 KEY_HEIGHT = 42
 KEY_GAP = 4
-FONT_KEY = pygame.font.SysFont("Helvetica", 14, bold=True)
+FONT_KEY = load_ui_font(14, bold=True)
 KEYBOARD_START_Y = START_Y + (ROWS * (TILE_SIZE + GAP)) + 15
 
 def draw_keyboard(surface: pygame.Surface, key_colors: dict[str, tuple[int, int, int] | None]) -> None:
@@ -228,9 +264,9 @@ def draw_keyboard(surface: pygame.Surface, key_colors: dict[str, tuple[int, int,
             surface.blit(text_surf, text_rect)
 
 # --- Additional Fonts for Analytics Modal ---
-FONT_ANALYTICS_HEADER = pygame.font.SysFont("Helvetica", 18, bold=True)
-FONT_ANALYTICS_CELL   = pygame.font.SysFont("Helvetica", 13)
-FONT_MODAL_TITLE      = pygame.font.SysFont("Helvetica", 20, bold=True)
+FONT_ANALYTICS_HEADER = load_ui_font(18, bold=True)
+FONT_ANALYTICS_CELL   = load_ui_font(13)
+FONT_MODAL_TITLE      = load_ui_font(20, bold=True, role="title")
 
 # Extended Colors
 MODAL_BG     = (255, 255, 255)
