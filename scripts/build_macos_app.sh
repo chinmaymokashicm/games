@@ -1,20 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="Wordle by Chinmay Mokashi"
+APP_NAME="${APP_NAME:-$(python3 -c 'from scripts.app_registry import DEFAULT_APP_NAME; print(DEFAULT_APP_NAME)')}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 AUTO_INSTALL_PYTHON="${AUTO_INSTALL_PYTHON:-0}"
 VENV_DIR="$ROOT_DIR/.venv-mac"
-ICON_PNG="$ROOT_DIR/assets/wordle/logo.png"
-ICON_ICNS="$ROOT_DIR/assets/wordle/logo.icns"
 TARGET_ARCH="${TARGET_ARCH:-$(uname -m)}"
+
+for arg in "$@"; do
+  case "$arg" in
+    --app=*) APP_NAME="${arg#*=}" ;;
+    --app) shift; APP_NAME="${1:-$APP_NAME}" ;;
+    --list-apps) python3 -c 'from scripts.app_registry import list_app_names; print("\n".join(list_app_names()))'; exit 0 ;;
+  esac
+done
 
 if [[ "$TARGET_ARCH" != "x86_64" && "$TARGET_ARCH" != "arm64" && "$TARGET_ARCH" != "universal2" ]]; then
   echo "Unsupported TARGET_ARCH: $TARGET_ARCH"
   echo "Use one of: x86_64, arm64, universal2"
   exit 1
 fi
+
+APP_SPEC_JSON="$(python3 -c 'import json, sys; from scripts.app_registry import resolve_app_spec; print(json.dumps(resolve_app_spec(sys.argv[1])))' "$APP_NAME")"
+APP_DISPLAY_NAME="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["display_name"])' "$APP_SPEC_JSON")"
+ENTRY_SCRIPT="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["entry_script"])' "$APP_SPEC_JSON")"
+ASSET_DIR="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["asset_dir"])' "$APP_SPEC_JSON")"
+ICON_PNG="$ROOT_DIR/$ASSET_DIR/logo.png"
+ICON_ICNS="$ROOT_DIR/$ASSET_DIR/logo.icns"
 
 cd "$ROOT_DIR"
 
@@ -42,8 +55,8 @@ fi
 
 if ! check_python_version "$PYTHON_BIN"; then
   echo "Python 3.11+ is required."
-  echo "Use: PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh"
-  echo "Or auto-install: AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh"
+  echo "Use: PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh --app 'Sudoku by Chinmay Mokashi'"
+  echo "Or auto-install: AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh --app 'Sudoku by Chinmay Mokashi'"
   exit 1
 fi
 
@@ -79,17 +92,17 @@ pyinstaller \
   --noconfirm \
   --clean \
   --windowed \
-  --name "$APP_NAME" \
+  --name "$APP_DISPLAY_NAME" \
   --target-architecture "$TARGET_ARCH" \
-  --add-data "assets/wordle:assets/wordle" \
+  --add-data "$ASSET_DIR:$ASSET_DIR" \
   "${ICON_ARG[@]}" \
-  wordle_ui.py
+  "$ENTRY_SCRIPT"
 
 pushd dist >/dev/null
-zip -r "$APP_NAME-macOS.zip" "$APP_NAME.app" >/dev/null
+zip -r "$APP_DISPLAY_NAME-macOS.zip" "$APP_DISPLAY_NAME.app" >/dev/null
 popd >/dev/null
 
 echo "Build complete."
 echo "Architecture: $TARGET_ARCH"
-echo "App bundle: $ROOT_DIR/dist/$APP_NAME.app"
-echo "Shareable zip: $ROOT_DIR/dist/$APP_NAME-macOS.zip"
+echo "App bundle: $ROOT_DIR/dist/$APP_DISPLAY_NAME.app"
+echo "Shareable zip: $ROOT_DIR/dist/$APP_DISPLAY_NAME-macOS.zip"
