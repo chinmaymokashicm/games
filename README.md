@@ -23,53 +23,73 @@ If `origin` already exists, update it with:
 
 - `git remote set-url origin <your-github-repo-url>`
 
-## Build Windows app
+## Dynamic app registry
+
+The project now uses a shared app registry in `scripts/app_registry.py`.
+This lets us define a human-friendly game name once and reuse the same Windows/macOS build flow for any game.
+
+Example entries:
+
+- `Wordle by Chinmay Mokashi` -> `wordle_ui.py`
+- `Sudoku by Chinmay Mokashi` -> `sudoku.py`
+
+To add a new game, update `APP_REGISTRY` in `scripts/app_registry.py` with:
+
+- the display name
+- the entry script
+- the asset folder for the game logo and icons
+
+## Build a specific app
 
 ### Local build (Windows)
 
-1. Run:
-	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1`
-	- Optional explicit interpreter: `$env:PYTHON_BIN='C:\Path\To\Python311\python.exe'; powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1`
-	- Optional auto-install Python 3.11 (winget): `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -InstallPython`
-2. Outputs:
-	- `dist_windows/Wordle by Chinmay Mokashi/Wordle by Chinmay Mokashi.exe`
-	- `dist_windows/Wordle by Chinmay Mokashi-windows.zip`
-3. Optional Start Menu install:
-	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -Install`
+1. List apps:
+	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -ListApps`
+2. Build a specific app:
+	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -AppName "Sudoku by Chinmay Mokashi"`
+	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -AppName "Wordle by Chinmay Mokashi"`
+	- Optional explicit interpreter: `$env:PYTHON_BIN='C:\Path\To\Python311\python.exe'; powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -AppName "Sudoku by Chinmay Mokashi"`
+	- Optional auto-install Python 3.11 (winget): `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -AppName "Sudoku by Chinmay Mokashi" -InstallPython`
+3. Outputs:
+	- `dist_windows/Sudoku by Chinmay Mokashi/Sudoku by Chinmay Mokashi.exe`
+	- `dist_windows/Sudoku by Chinmay Mokashi-windows.zip`
+4. Optional Start Menu install:
+	- `powershell -ExecutionPolicy Bypass -File scripts/build_windows_app.ps1 -AppName "Sudoku by Chinmay Mokashi" -Install`
 
-### GitHub Actions build (Windows)
+### Local build (macOS)
+
+1. List apps:
+	- `./scripts/build_macos_app.sh --list-apps`
+2. Build a specific app:
+	- `APP_NAME="Sudoku by Chinmay Mokashi" ./scripts/build_macos_app.sh --app "Sudoku by Chinmay Mokashi"`
+	- `APP_NAME="Wordle by Chinmay Mokashi" ./scripts/build_macos_app.sh --app "Wordle by Chinmay Mokashi"`
+	- Optional explicit interpreter: `PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh --app "Sudoku by Chinmay Mokashi"`
+	- Optional auto-install Python 3.11 (Homebrew): `AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh --app "Sudoku by Chinmay Mokashi"`
+	- Optional architecture override: `TARGET_ARCH=universal2 ./scripts/build_macos_app.sh --app "Sudoku by Chinmay Mokashi"`
+3. Output:
+	- `dist/Sudoku by Chinmay Mokashi.app`
+	- `dist/Sudoku by Chinmay Mokashi-macOS.zip`
+
+## GitHub Actions builds
+
+### Windows
 
 1. Open Actions in GitHub.
 2. Run workflow: `Build Windows App`.
-3. Download artifact: `wordle-by-chinmay-mokashi-windows`.
+3. Download the built artifact for the named app.
 
-## Build macOS app
+### macOS
 
-### Local build (Mac)
+The workflow builds architecture-specific artifacts for each app so you can share with modern Mac users.
 
-1. Copy this repository to a Mac.
-2. Run:
-	- `chmod +x scripts/build_macos_app.sh`
-	- `./scripts/build_macos_app.sh`
-	- Optional explicit interpreter: `PYTHON_BIN=python3.11 ./scripts/build_macos_app.sh`
-	- Optional auto-install Python 3.11 (Homebrew): `AUTO_INSTALL_PYTHON=1 ./scripts/build_macos_app.sh`
-	- Optional architecture override: `TARGET_ARCH=universal2 ./scripts/build_macos_app.sh`
-3. Output:
-	- `dist/Wordle by Chinmay Mokashi.app`
-	- `dist/Wordle by Chinmay Mokashi-macOS.zip`
-
-### GitHub Actions build (macOS for Intel and Apple Silicon)
-
-The workflow builds two architecture-specific artifacts so you can share with all modern Mac users:
-
-- `wordle-by-chinmay-mokashi-macos-x86_64`
-- `wordle-by-chinmay-mokashi-macos-arm64`
+- Intel build: `*-macos-x86_64`
+- Apple Silicon build: `*-macos-arm64`
 
 Run steps:
 
 1. Open Actions in GitHub.
 2. Run workflow: `Build macOS App`.
-3. Download both artifacts and distribute the right one by CPU type.
+3. Download the correct artifact by CPU type.
 
 ## macOS signing and notarization (recommended)
 
