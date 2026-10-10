@@ -253,15 +253,16 @@ while running:
                 r = (my - GRID_OFFSET_Y) // CELL_SIZE
                 selected_cell = (r, c)
 
-        # Keyboard Number Inputs (1-9 & Backspace)
         if event.type == pygame.KEYDOWN and selected_cell:
             r, c = selected_cell
+            # Keyboard Number Inputs (1-9 & Backspace)
             if not given_mask[r][c]:  # Only edit user cells
                 if event.unicode.isdigit() and event.unicode != '0':
                     board[r][c] = int(event.unicode)
                     # Check if the board is complete
                     if is_board_complete(board):
-                        if board == game.board:
+                        # if board == game.board:
+                        if game.is_board_valid(board):
                             status_message = "Congratulations! You completed the puzzle."
                             status_color = STATUS_GOOD
                         else:
@@ -272,6 +273,15 @@ while running:
                 elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
                     board[r][c] = 0
                     status_message = ""
+            # Grid Traversal via Arrow Keys
+            if event.key == pygame.K_UP and r > 0:
+                selected_cell = (r - 1, c)
+            elif event.key == pygame.K_DOWN and r < 8:
+                selected_cell = (r + 1, c)
+            elif event.key == pygame.K_LEFT and c > 0:
+                selected_cell = (r, c - 1)
+            elif event.key == pygame.K_RIGHT and c < 8:
+                selected_cell = (r, c + 1)
 
     # Render
     screen.fill(COLOR_BG)
