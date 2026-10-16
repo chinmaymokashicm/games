@@ -9,6 +9,21 @@ Use Python `3.11` for local builds and runtime.
 - GitHub Actions workflows also verify Python `3.11` explicitly.
 - The apps now show a friendly startup error if run with an older Python interpreter.
 
+## Project setup
+
+1. Install Python `3.11`.
+2. Create and activate a virtual environment in the project root:
+	- Windows (PowerShell): `python -m venv .venv; .\.venv\Scripts\Activate.ps1`
+	- macOS/Linux: `python3.11 -m venv .venv && source .venv/bin/activate`
+3. Install dependencies:
+	- `python -m pip install --upgrade pip`
+	- `pip install pygame tabulate pyinstaller`
+	- `pygame` is needed by the GUI games, `tabulate` by the terminal Wordle, and `pyinstaller` only for building apps.
+4. Run a game:
+	- `python sudoku.py`
+	- `python wordle_ui.py`
+	- `python wordle_terminal.py`
+
 ## Push this repo to GitHub
 
 1. Create a new empty repository on GitHub.
@@ -75,7 +90,7 @@ To add a new game, update `APP_REGISTRY` in `scripts/app_registry.py` with:
 ### Windows
 
 1. Open Actions in GitHub.
-2. Run workflow: `Build Windows App`.
+2. Run workflow: `Build Windows App` and pick the app in the `app_name` dropdown.
 3. Download the built artifact for the named app.
 
 ### macOS
@@ -88,7 +103,7 @@ The workflow builds architecture-specific artifacts for each app so you can shar
 Run steps:
 
 1. Open Actions in GitHub.
-2. Run workflow: `Build macOS App`.
+2. Run workflow: `Build macOS App` and pick the app in the `app_name` dropdown (add new games to the dropdown in the workflow files too).
 3. Download the correct artifact by CPU type.
 
 ## macOS signing and notarization (recommended)
